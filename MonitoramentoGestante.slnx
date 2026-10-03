@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="monitoramentogestante.client/monitoramentogestante.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="MonitoramentoGestante.Server/MonitoramentoGestante.Server.csproj" />
+</Solution>
