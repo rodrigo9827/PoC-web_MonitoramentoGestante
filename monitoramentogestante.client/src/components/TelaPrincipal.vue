@@ -1,20 +1,53 @@
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, watch } from 'vue'
   import { listarEnfermeiras } from '@/services/enfermeiraService'
+  import { listarGestantes, type Gestante } from '@/services/gestanteService'
 
   const enfermeiras = ref<string[]>([])
   const enfermeiraSelecionada = ref('')
+  const gestantes = ref<Gestante[]>([])
   const erro = ref('')
 
   async function carregarEnfermeiras() {
     try {
       enfermeiras.value = await listarEnfermeiras()
+      erro.value = ''
     } catch {
       erro.value = 'Não foi possível carregar as enfermeiras. Verifique se o servidor está ligado.'
     }
-
   }
+
+  async function carregarGestantes() {
+    try {
+      gestantes.value = await listarGestantes(enfermeiraSelecionada.value)
+      erro.value = ''
+    } catch {
+      gestantes.value = []
+      erro.value = 'Não foi possível buscar as gestantes. Verifique se o servidor está ligado.'
+    }
+  }
+
+  // "2026-09-23" -> "23/09/2026" (ou — se vier vazio)
+  function formatarData(data: string | null): string {
+    if (!data) return '—'
+    const [ano, mes, dia] = data.split('-')
+    return `${dia}/${mes}/${ano}`
+  }
+
+  // 30 e 2 -> "30s 2d" (ou — se não houver IG)
+  function formatarIg(g: Gestante): string {
+    if (g.igSemanas === null) return '—'
+    return `${g.igSemanas}s ${g.igDiasResto}d`
+  }
+
+  function textoOuTraco(valor: string | null): string {
+    return valor ? valor : '—'
+  }
+
   onMounted(carregarEnfermeiras)
+
+  // toda vez que a enfermeira escolhida mudar, busca as gestantes dela
+  watch(enfermeiraSelecionada, carregarGestantes)
 </script>
 
 <template>
@@ -31,21 +64,60 @@
         Selecione um(a) Enfermeira(o)
       </option>
       <option v-for="nome in enfermeiras" :key="nome" :value="nome">
-      {{ nome }}
+        {{ nome }}
       </option>
     </select>
 
     <p v-if="erro" class="erro">
-      {{erro}}
+      {{ erro }}
     </p>
-    <p v-else-if="enfermeiraSelecionada">
-    Selecionada(o): {{ enfermeiraSelecionada }}
+
+    <table v-if="enfermeiraSelecionada">
+      <thead>
+        <tr>
+          <th>Gestante</th>
+          <th>CNS</th>
+          <th>Contato</th>
+          <th>IG</th>
+          <th>Retorno</th>
+          <th>Risco</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(g, i) in gestantes" :key="i" :class="{ 'alto-risco': g.altoRisco === 1 }">
+          <td>{{ textoOuTraco(g.gestante) }}</td>
+          <td>{{ textoOuTraco(g.cns) }}</td>
+          <td>{{ formatarData(g.dataContato) }}</td>
+          <td>{{ formatarIg(g) }}</td>
+          <td>{{ formatarData(g.dataRetorno) }}</td>
+          <td>{{ g.altoRisco === 1 ? 'Alto Risco' : '' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p v-if="enfermeiraSelecionada">
+      {{ gestantes.length }} gestante(s)
     </p>
   </main>
 </template>
 
 <style scoped>
-  .erro{
+  .erro {
     color: #c00;
+  }
+
+  table {
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 4px 12px;
+    border-bottom: 1px solid #555;
+  }
+
+  .alto-risco td {
+    color: #ff5252;
   }
 </style>

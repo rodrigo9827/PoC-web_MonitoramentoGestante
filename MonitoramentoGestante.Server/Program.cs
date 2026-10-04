@@ -15,6 +15,7 @@ builder.Services.AddDbContext<MonitoramentoContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("PocGestante")));
 
 builder.Services.AddScoped<IEnfermeiraService, EnfermeiraService>();
+builder.Services.AddScoped<IGestanteService, GestanteService>();
 
 var app = builder.Build();
 
