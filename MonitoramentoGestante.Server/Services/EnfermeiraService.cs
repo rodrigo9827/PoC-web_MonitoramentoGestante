@@ -1,10 +1,23 @@
-﻿namespace MonitoramentoGestante.Server.Services
+﻿using MonitoramentoGestante.Server.Data;
+
+namespace MonitoramentoGestante.Server.Services
 {
     public class EnfermeiraService : IEnfermeiraService
     {
+        private readonly MonitoramentoContext _context;
+
+        public EnfermeiraService(MonitoramentoContext context)
+        {
+            _context = context;
+        }
         public IEnumerable<string> Listar()
         {
-            return ["Enfermeira Teste 1","Enfermeira Teste 2","Enfermeira Teste 3"];
+            return _context.GestantesRetorno
+                .Where(g => g.Enfermeira != null)
+                .Select(g => g.Enfermeira!)
+                .Distinct()
+                .OrderBy(nome => nome)
+                .ToList();
         }
     }
 }

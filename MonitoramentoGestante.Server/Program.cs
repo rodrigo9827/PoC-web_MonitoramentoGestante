@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using MonitoramentoGestante.Server.Data;
 using MonitoramentoGestante.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,8 +8,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddScoped<IEnfermeiraService, EnfermeiraService>();
 builder.Services.AddOpenApi();
+
+// Banco de dados: o endereço vem dos Segredos do Usuário (conexão "PocGestante")
+builder.Services.AddDbContext<MonitoramentoContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("PocGestante")));
+
+builder.Services.AddScoped<IEnfermeiraService, EnfermeiraService>();
 
 var app = builder.Build();
 

@@ -26,20 +26,20 @@
     <label for="enfermeira">
       Enfermeiro(a):
     </label>
-    <selsect id="enfermeira" v-model="enfermeiraSelecionada">
+    <select id="enfermeira" v-model="enfermeiraSelecionada">
       <option value="" disabled>
-        Selecione uma Enfermeira
+        Selecione um(a) Enfermeira(o)
       </option>
       <option v-for="nome in enfermeiras" :key="nome" :value="nome">
       {{ nome }}
       </option>
-    </selsect>
+    </select>
 
     <p v-if="erro" class="erro">
       {{erro}}
     </p>
     <p v-else-if="enfermeiraSelecionada">
-    Selecionada: {{ enfermeiraSelecionada }}
+    Selecionada(o): {{ enfermeiraSelecionada }}
     </p>
   </main>
 </template>
