@@ -40,17 +40,24 @@ namespace MonitoramentoGestante.Server.Regras
             if (CpfValido(cpf)) return "CPF " + SoDigitos(cpf);
             return null;
         }
-        // Tratando as semanas gestacionais no formato (ss+dd) xs xd
-        //semanas de 0 - 45, dias de 0 - 6
-        // 30 + 02 vira 30s 02d se não tiver neste formato devolve null
+
+        // Lê a idade gestacional digitada: "ss+dd" (ex.: 30+2) ou só "ss" (dias = 0)
+        // semanas de 0 - 45, dias de 0 - 6, só algarismos, no máximo 2 em cada parte
+        // "30+2" vira os números (30, 2); fora do formato devolve null
         public static (int Semanas, int Dias)? LerIg(string? texto)
         {
-            // Ver se isto está bom ou deve ser trocado por outro símbolo
-            var partes = (texto ?? "").Trim().Split('+');
-            if (partes.Length != 2) return null;
-            if (!int.TryParse(partes[0], out int semanas)) return null;
-            if (!int.TryParse(partes[1], out int dias)) return null;
-            if (semanas < 0 || semanas > 45 || dias < 0 || dias > 6) return null;
+            var partes = (texto ?? "").Replace(" ", "").Split('+');
+            if (partes.Length > 2) return null;
+
+            foreach (var parte in partes)
+            {
+                bool soAlgarismos = parte.Length > 0 && SoDigitos(parte).Length == parte.Length;
+                if (!soAlgarismos || parte.Length > 2) return null;
+            }
+
+            int semanas = int.Parse(partes[0]);
+            int dias = partes.Length == 2 ? int.Parse(partes[1]) : 0;
+            if (semanas > 45 || dias > 6) return null;
             return (semanas, dias);
         }
         // Aqui é a formatação só fala onde vão os dias e as semanas

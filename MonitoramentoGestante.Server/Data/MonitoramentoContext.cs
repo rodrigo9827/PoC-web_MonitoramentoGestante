@@ -10,6 +10,8 @@ namespace MonitoramentoGestante.Server.Data
         public MonitoramentoContext(DbContextOptions<MonitoramentoContext> options) : base(options)
         {}
         public DbSet<GestanteRetorno> GestantesRetorno => Set<GestanteRetorno>();
+        public DbSet<GestanteAtual> GestantesAtuais => Set<GestanteAtual>();
+        public DbSet<MonitoraGestanteAdm> HistoricoAdm => Set<MonitoraGestanteAdm>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<GestanteRetorno>(e =>

@@ -50,22 +50,27 @@ namespace MonitoramentoGestante.Tests
         [Theory]
         [InlineData("30+2", 30, 2)]
         [InlineData(" 30+2 ", 30, 2)]
+        [InlineData("30 + 2", 30, 2)]       // espaços no meio
+        [InlineData("30", 30, 0)]           // só as semanas: dias = 0
         [InlineData("0+0", 0, 0)]
         [InlineData("45+6", 45, 6)]
         public void LerIg_FormatoCerto(string texto, int semanas, int dias)
         {
             var ig = RegrasGestante.LerIg(texto);
+
             Assert.NotNull(ig);
             Assert.Equal(semanas, ig.Value.Semanas);
             Assert.Equal(dias, ig.Value.Dias);
         }
 
         [Theory]
-        [InlineData("30")]        
-        [InlineData("30+7")]      
-        [InlineData("46+0")]      
+        [InlineData("30+7")]        // 7 dias já é outra semana
+        [InlineData("46+0")]        // passou de 45 semanas
         [InlineData("abc+2")]
         [InlineData("30+2+1")]
+        [InlineData("30+")]         // faltou o número dos dias
+        [InlineData("-0+3")]        // sinal não é aceito
+        [InlineData("030+2")]       // mais de 2 algarismos
         [InlineData("")]
         [InlineData(null)]
         public void LerIg_FormatoErrado_DevolveNull(string? texto)
