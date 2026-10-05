@@ -1,14 +1,12 @@
-﻿using Microsoft.Data.SqlClient.DataClassification;
-using System.Net.WebSockets;
-// sou o cara que confere o valor e devolve a resposta
+﻿// sou o cara que confere o valor e devolve a resposta
 namespace MonitoramentoGestante.Server.Regras
 {
     // Regras do atendimento
     public static class RegrasGestante
     {
         public static string SoDigitos(string? texto)
-        {// Salvar apenas os dígitos do texto unico caractére especial '+'
-            return new string((texto ?? "").Where(c => (c >= '0' && c <= '9') || c == '+').ToArray());
+        {// Salvar apenas os dígitos do texto
+            return new string((texto ?? "").Where(c => c >= '0' && c <= '9').ToArray());
         }
         // Cns Válido só aceita 15 números e apenas digitos de 0 - 9
         public static bool CnsValido(string? cns)
@@ -58,7 +56,7 @@ namespace MonitoramentoGestante.Server.Regras
         // Aqui é a formatação só fala onde vão os dias e as semanas
         public static string FormatarIg(int semanas, int dias)
         {
-            return $"{semanas}s {dias}d";
+            return $"{semanas:00}s {dias:00}d";
         }
         // Regra das datas do tempo de ligação.
         public static DateOnly CalcularRetorno(DateOnly contato, int semanas, int dias)

@@ -4,4 +4,5 @@
     <Deploy />
   </Project>
   <Project Path="MonitoramentoGestante.Server/MonitoramentoGestante.Server.csproj" />
+  <Project Path="MonitoramentoGestante.Tests/MonitoramentoGestante.Tests.csproj" Id="5a95dbd6-3f79-40bf-9a9e-321c2e9765ff" />
 </Solution>
