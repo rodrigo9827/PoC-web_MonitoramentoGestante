@@ -1,13 +1,14 @@
 export interface Gestante {
-  enfermeira: string | null
-  cns: string | null
+  chave: string | null
   gestante: string | null
+  cns: string | null
+  cpf: string | null
   dataContato: string | null
   igSemanas: number | null
-  igDiasResto: number | null
+  igDias: number | null
   dataRetorno: string | null
-  altoRisco: number | null
-  cpf: string | null
+  altoRisco: boolean
+  buscaAtiva: string | null
 }
 export async function listarGestantes(enfermeira: string): Promise<Gestante[]> {
   const resposta = await fetch(`/api/gestantes?enfermeira=${encodeURIComponent(enfermeira)}`)

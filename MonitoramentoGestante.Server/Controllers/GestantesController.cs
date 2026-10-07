@@ -15,7 +15,7 @@ namespace MonitoramentoGestante.Server.Controllers
         }
         // GET /api/gestantes?enfermeira=NOME
         [HttpGet]
-        public ActionResult<IEnumerable<GestanteRetorno>> Listar([FromQuery] string enfermeira)
+        public ActionResult<IEnumerable<GestanteLista>> Listar([FromQuery] string enfermeira)
         {
             return Ok(_service.ListarPorEnfermeira(enfermeira));
         }

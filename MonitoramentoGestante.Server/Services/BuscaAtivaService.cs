@@ -13,7 +13,7 @@ namespace MonitoramentoGestante.Server.Services
     // ou as duas ficam, ou nenhuma. Nunca escrevo em dbo.* nem em stg.*.
     public class BuscaAtivaService : IBuscaAtivaService
     {
-        private const string NomeFormulario = "Busca Ativa";
+        public const string NomeFormulario = "Busca Ativa";
         private static readonly string[] Classificacoes = ["Gestante", "Puérpera", "Aborto"];
 
         private readonly MonitoramentoContext _context;

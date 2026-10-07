@@ -4,6 +4,6 @@ namespace MonitoramentoGestante.Server.Services
 {
     public interface IGestanteService
     {
-        IEnumerable<GestanteRetorno> ListarPorEnfermeira(string enfermeira);
+        IEnumerable<GestanteLista> ListarPorEnfermeira(string enfermeira);
     }
 }

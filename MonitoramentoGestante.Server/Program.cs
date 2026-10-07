@@ -16,6 +16,7 @@ builder.Services.AddDbContext<MonitoramentoContext>(options =>
 
 builder.Services.AddScoped<IEnfermeiraService, EnfermeiraService>();
 builder.Services.AddScoped<IGestanteService, GestanteService>();
+builder.Services.AddScoped<IBuscaAtivaService, BuscaAtivaService>();
 
 var app = builder.Build();
 

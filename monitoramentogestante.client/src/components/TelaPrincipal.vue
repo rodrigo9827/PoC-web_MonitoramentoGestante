@@ -36,9 +36,10 @@
 
   // 30 e 2 -> "30s 2d" (ou — se não houver IG)
   function formatarIg(g: Gestante): string {
-    if (g.igSemanas === null) return '—'
-    return `${g.igSemanas}s ${g.igDiasResto}d`
-  }
+    if (g.igSemanas === null) return '-'
+    const dois = (n: number | null) => String(n ?? 0).padStart(2, '0')
+    return `${dois(g.igSemanas)}s ${dois(g.igDias)}`
+    }
 
   function textoOuTraco(valor: string | null): string {
     return valor ? valor : '—'
@@ -81,16 +82,18 @@
           <th>IG</th>
           <th>Retorno</th>
           <th>Risco</th>
+          <th>Busca Ativa</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(g, i) in gestantes" :key="i" :class="{ 'alto-risco': g.altoRisco === 1 }">
+        <tr v-for="(g, i) in gestantes" :key="i" :class="{ 'alto-risco': g.altoRisco }">
           <td>{{ textoOuTraco(g.gestante) }}</td>
           <td>{{ textoOuTraco(g.cns) }}</td>
           <td>{{ formatarData(g.dataContato) }}</td>
           <td>{{ formatarIg(g) }}</td>
           <td>{{ formatarData(g.dataRetorno) }}</td>
-          <td>{{ g.altoRisco === 1 ? 'Alto Risco' : '' }}</td>
+          <td>{{ g.altoRisco ? 'Alto Risco' : '' }}</td>
+          <td>{{ g.buscaAtiva ?? '' }}</td>
         </tr>
       </tbody>
     </table>
