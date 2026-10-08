@@ -1,16 +1,14 @@
-﻿using System.Data;
-using Microsoft.EntityFrameworkCore;
-using MonitoramentoGestante.Server.Data;
+﻿using MonitoramentoGestante.Server.Data;
 using MonitoramentoGestante.Server.Models;
 using MonitoramentoGestante.Server.Regras;
+using static MonitoramentoGestante.Server.Services.GravacaoGestante;
 
 namespace MonitoramentoGestante.Server.Services
 {
     // Eu sou o cara que registra a Busca Ativa de verdade.
     // Recebo o formulário, confiro tudo com as regras do RegrasGestante e, se estiver certo,
-    // gravo uma linha nova no histórico (app.Monitora_Gestante_Adm) e insiro ou atualizo
-    // a situação da gestante (app.Gestante_Atual), as duas juntas numa transação:
-    // ou as duas ficam, ou nenhuma. Nunca escrevo em dbo.* nem em stg.*.
+    // monto a linha do histórico e a situação atual da gestante e entrego as duas
+    // para o GravacaoGestante gravar juntas numa transação. Nunca escrevo em dbo.* nem em stg.*.
     public class BuscaAtivaService : IBuscaAtivaService
     {
         public const string NomeFormulario = "Busca Ativa";
@@ -89,24 +87,8 @@ namespace MonitoramentoGestante.Server.Services
                 DataHoraModificacao = agora
             };
 
-            // ---------- 4. Gravar as duas juntas ----------
-            using var transacao = _context.Database.BeginTransaction(IsolationLevel.Serializable);
-
-            _context.HistoricoAdm.Add(historico);
-
-            var atual = _context.GestantesAtuais.FirstOrDefault(g => g.Chave == chave);
-            if (atual is null)
-            {
-                _context.GestantesAtuais.Add(nova);
-            }
-            else if (nova.DataContato >= atual.DataContato)
-            {
-                Atualizar(atual, nova);
-            }
-            // contato mais antigo que o guardado: só o histórico é gravado
-
-            _context.SaveChanges();
-            transacao.Commit();
+            // ---------- 4. Gravar as duas juntas (transação + regras do MERGE) ----------
+            GravacaoGestante.Gravar(_context, historico, nova);
 
             resultado.Chave = chave;
             resultado.DataRetorno = retorno;
@@ -160,55 +142,6 @@ namespace MonitoramentoGestante.Server.Services
                 erros.Add("Marque a classificação da gestante (Gestante, Puérpera ou Aborto).");
 
             return erros;
-        }
-
-        // Mesmas regras do MERGE do gravar_banco.py:
-        // campo que veio vazio NÃO apaga o que já estava guardado
-        private static void Atualizar(GestanteAtual atual, GestanteAtual nova)
-        {
-            atual.Cns = nova.Cns ?? atual.Cns;
-            atual.Cpf = nova.Cpf ?? atual.Cpf;
-            atual.Gestante = nova.Gestante ?? atual.Gestante;
-            atual.Enfermeira = nova.Enfermeira ?? atual.Enfermeira;
-            atual.Teleoperador = nova.Teleoperador ?? atual.Teleoperador;
-            atual.Classificacao = nova.Classificacao ?? atual.Classificacao;
-            atual.ConseguiuContato = nova.ConseguiuContato ?? atual.ConseguiuContato;
-            atual.DataContato = nova.DataContato;
-
-            if (nova.IgSemanas is not null)             // semanas e dias andam juntos
-            {
-                atual.IgSemanas = nova.IgSemanas;
-                atual.IgDias = nova.IgDias;
-            }
-
-            atual.DataRetorno = nova.DataRetorno ?? atual.DataRetorno;
-            atual.AltoRisco = nova.AltoRisco ?? atual.AltoRisco;
-            atual.CasoCritico = nova.CasoCritico ?? atual.CasoCritico;
-            atual.QualCasoCritico = nova.CasoCritico == "Não"
-                ? null                                  // caso crítico "Não" limpa a descrição
-                : nova.QualCasoCritico ?? atual.QualCasoCritico;
-            atual.UltimaObservacao = nova.UltimaObservacao ?? atual.UltimaObservacao;
-            atual.UltimoFormulario = nova.UltimoFormulario;
-            atual.DataHoraModificacao = nova.DataHoraModificacao;
-        }
-
-        private static string SimNao(bool valor) => valor ? "Sim" : "Não";
-
-        private static string? VazioParaNull(string? texto) => string.IsNullOrEmpty(texto) ? null : texto;
-
-        // Quebras de linha viram " / " (igual ao Python); texto vazio vira null
-        private static string? UmaLinha(string? texto)
-        {
-            var partes = (texto ?? "").Split('\n',
-                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return partes.Length == 0 ? null : string.Join(" / ", partes);
-        }
-
-        // O banco guarda data e hora sem frações de segundo
-        private static DateTime AgoraSemFracao()
-        {
-            var n = DateTime.Now;
-            return new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, n.Second);
         }
     }
 }
