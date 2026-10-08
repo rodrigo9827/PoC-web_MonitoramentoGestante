@@ -1,12 +1,21 @@
+<!--
+  Eu sou o cara que monta a tela principal: deixo escolher a enfermeira, mostro as gestantes dela
+  na tabela (com a coluna Busca Ativa) e abro o formulário de Registrar Busca Ativa.
+  Quando o formulário avisa que gravou, mostro o aviso verde e recarrego a lista.
+-->
 <script setup lang="ts">
   import { ref, onMounted, watch } from 'vue'
   import { listarEnfermeiras } from '@/services/enfermeiraService'
   import { listarGestantes, type Gestante } from '@/services/gestanteService'
+  import type { ResultadoGravacao } from '@/services/buscaAtivaService'
+  import BuscaAtivaForm from './BuscaAtivaForm.vue'
 
   const enfermeiras = ref<string[]>([])
   const enfermeiraSelecionada = ref('')
   const gestantes = ref<Gestante[]>([])
   const erro = ref('')
+  const aviso = ref('')
+  const mostrarBuscaAtiva = ref(false)
 
   async function carregarEnfermeiras() {
     try {
@@ -27,6 +36,18 @@
     }
   }
 
+  // Listener do formulário: a busca ativa foi gravada
+  async function aoSalvarBuscaAtiva(resultado: ResultadoGravacao) {
+    mostrarBuscaAtiva.value = false
+    aviso.value = `Busca ativa registrada. Retorno: ${formatarData(resultado.dataRetorno)}`
+    if (enfermeiraSelecionada.value) await carregarGestantes()
+  }
+
+  function abrirBuscaAtiva() {
+    aviso.value = ''
+    mostrarBuscaAtiva.value = true
+  }
+
   // "2026-09-23" -> "23/09/2026" (ou — se vier vazio)
   function formatarData(data: string | null): string {
     if (!data) return '—'
@@ -34,12 +55,12 @@
     return `${dia}/${mes}/${ano}`
   }
 
-  // 30 e 2 -> "30s 2d" (ou — se não houver IG)
+  // 30 e 2 -> "30s 02d" (ou — se não houver IG)
   function formatarIg(g: Gestante): string {
-    if (g.igSemanas === null) return '-'
+    if (g.igSemanas === null) return '—'
     const dois = (n: number | null) => String(n ?? 0).padStart(2, '0')
-    return `${dois(g.igSemanas)}s ${dois(g.igDias)}`
-    }
+    return `${dois(g.igSemanas)}s ${dois(g.igDias)}d`
+  }
 
   function textoOuTraco(valor: string | null): string {
     return valor ? valor : '—'
@@ -69,10 +90,6 @@
       </option>
     </select>
 
-    <p v-if="erro" class="erro">
-      {{ erro }}
-    </p>
-
     <table v-if="enfermeiraSelecionada">
       <thead>
         <tr>
@@ -101,12 +118,38 @@
     <p v-if="enfermeiraSelecionada">
       {{ gestantes.length }} gestante(s)
     </p>
+
+    <button type="button" class="acao" :disabled="mostrarBuscaAtiva" @click="abrirBuscaAtiva">
+      Registrar Busca Ativa
+    </button>
+
+    <!-- o formulário abre logo abaixo do botão, onde a enfermeira clicou -->
+    <BuscaAtivaForm v-if="mostrarBuscaAtiva"
+                    :enfermeiras="enfermeiras"
+                    :enfermeira-inicial="enfermeiraSelecionada"
+                    @salvo="aoSalvarBuscaAtiva"
+                    @fechar="mostrarBuscaAtiva = false" />
+
+    <p v-if="erro" class="erro">
+      {{ erro }}
+    </p>
+    <p v-if="aviso" class="aviso">
+      {{ aviso }}
+    </p>
   </main>
 </template>
 
 <style scoped>
   .erro {
     color: #c00;
+  }
+
+  .aviso {
+    color: #4caf50;
+  }
+
+  .acao {
+    margin-top: 12px;
   }
 
   table {
