@@ -160,7 +160,10 @@
         <tr v-for="(g, i) in gestantes" :key="i"
             :class="{ 'alto-risco': g.altoRisco, selecionada: g === selecionada }"
             @click="selecionarGestante(g)">
-          <td>{{ textoOuTraco(g.gestante) }}</td>
+          <!-- TODO Etapa 9: o clique no NOME inicia a automação do e-Saúde.
+          Diferente da PoC: lá o clique na linha fazia tudo junto;
+          aqui o clique na linha só seleciona e mostra as observações. -->
+          <td class="nome">{{ textoOuTraco(g.gestante) }}</td>
           <td>{{ textoOuTraco(g.cns) }}</td>
           <td>{{ formatarData(g.dataContato) }}</td>
           <td>{{ formatarIg(g) }}</td>
