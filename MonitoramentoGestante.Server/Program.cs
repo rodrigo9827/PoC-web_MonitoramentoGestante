@@ -25,6 +25,7 @@ builder.Services.AddScoped<IEnfermeiraService, EnfermeiraService>();
 builder.Services.AddScoped<IGestanteService, GestanteService>();
 builder.Services.AddScoped<IBuscaAtivaService, BuscaAtivaService>();
 builder.Services.AddScoped<IObservacaoService, ObservacaoService>();
+builder.Services.AddScoped<IFinalizarAtendimentoService, FinalizarAtendimentoService>();
 
 var app = builder.Build();
 app.UseDefaultFiles();
