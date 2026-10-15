@@ -1,9 +1,13 @@
 <!-- Eu sou o cara que mostra o formulário "Registrar Busca Ativa".
-     Guardo o que a enfermeira digita, mando para o buscaAtivaService ao clicar em Enviar
-     e mostro os erros que o servidor devolver. Eu não confiro regra nenhuma. -->
+     Guardo o que a enfermeira digita, busco no servidor a lista de teleoperadores ativos
+     (id e nome), mando tudo para o buscaAtivaService ao clicar em Enviar
+     (com o Id do teleoperador) e mostro os erros que o servidor devolver.
+     Eu não confiro regra nenhuma. -->
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { ref, onMounted } from 'vue'
   import { registrarBuscaAtiva, type ResultadoGravacao } from '@/services/buscaAtivaService'
+  import { listarTeleoperadores } from '@/services/teleoperadorService'
+  import type { OpcaoLista } from '@/listas'
 
   const props = defineProps<{
     enfermeiras: string[]
@@ -28,13 +32,13 @@
     return `${hojeLocal()}T${dois(d.getHours())}:${dois(d.getMinutes())}:${dois(d.getSeconds())}`
   }
 
-  const horaInicio = agoraLocal()          
+  const horaInicio = agoraLocal()
 
   const enfermeira = ref(props.enfermeiraInicial)
   const gestante = ref('')
   const cns = ref('')
   const cpf = ref('')
-  const dataContato = ref(hojeLocal())     
+  const dataContato = ref(hojeLocal())
   const ig = ref('')
   const dataRetorno = ref('')
   const altoRisco = ref<boolean | null>(null)
@@ -42,6 +46,20 @@
   const qualCasoCritico = ref('')
   const classificacao = ref('Gestante')
   const observacoes = ref('')
+
+  // teleoperador: lista vinda do banco (app.Teleoperadores), já com o "Nenhum"
+  const teleoperadorId = ref<number | null>(null)
+  const teleoperadores = ref<OpcaoLista[]>([])
+  const avisoListas = ref('')
+
+  onMounted(async () => {
+    try {
+      teleoperadores.value = await listarTeleoperadores()
+    } catch {
+      teleoperadores.value = []
+      avisoListas.value = 'A lista de teleoperadores não carregou. Atualize a página (F5) antes de enviar.'
+    }
+  })
 
   const erros = ref<string[]>([])
   const enviando = ref(false)
@@ -53,6 +71,7 @@
     try {
       const resultado = await registrarBuscaAtiva({
         enfermeira: enfermeira.value,
+        teleoperadorId: teleoperadorId.value,
         gestante: gestante.value,
         cns: cns.value,
         cpf: cpf.value,
@@ -84,10 +103,18 @@
   <form class="busca-ativa" @submit.prevent="enviar">
     <h2>Registrar Busca Ativa</h2>
 
+    <p v-if="avisoListas" class="aviso">{{ avisoListas }}</p>
+
     <label for="ba-enfermeira">Enfermeiro(a):</label>
     <select id="ba-enfermeira" v-model="enfermeira">
       <option value="" disabled>Selecione um(a) Enfermeira(o)</option>
       <option v-for="nome in enfermeiras" :key="nome" :value="nome">{{ nome }}</option>
+    </select>
+
+    <label for="ba-teleoperador">Teleoperador(a):</label>
+    <select id="ba-teleoperador" v-model="teleoperadorId">
+      <option :value="null" disabled>Escolha o teleoperador (ou Nenhum)</option>
+      <option v-for="t in teleoperadores" :key="t.id" :value="t.id">{{ t.nome }}</option>
     </select>
 
     <label for="ba-gestante">Nome da Gestante:</label>
@@ -116,7 +143,8 @@
       <label><input v-model="altoRisco" type="radio" :value="true" /> Sim</label>
       <label><input v-model="altoRisco" type="radio" :value="false" /> Não</label>
     </div>
-    <!-- !alterar para o que o pedro já fez! -->
+
+    <!-- TODO: alterar o caso crítico para o que o Pedro já fez -->
     <span>Caso crítico?</span>
     <div>
       <label><input v-model="casoCritico" type="radio" :value="true" /> Sim</label>
@@ -162,7 +190,7 @@
     border: 1px solid #555;
   }
 
-  h2, .erros, .botoes {
+  h2, .erros, .botoes, .aviso {
     grid-column: 1 / -1;
   }
 
@@ -184,6 +212,11 @@
     color: #ff5252;
     margin: 0;
     padding-left: 20px;
+  }
+
+  .aviso {
+    color: #ffb74d;
+    margin: 0;
   }
 
   .botoes button + button {

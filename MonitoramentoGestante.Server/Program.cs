@@ -4,9 +4,11 @@
 using Microsoft.EntityFrameworkCore;
 using MonitoramentoGestante.Server.Data;
 using MonitoramentoGestante.Server.Services;
+using MonitoramentoGestante.Server.Security;
 
 var builder = WebApplication.CreateBuilder(args);
-
+// Security
+builder.AddHardening();
 
 // Adiciona o serviço ao container
 
@@ -26,8 +28,11 @@ builder.Services.AddScoped<IGestanteService, GestanteService>();
 builder.Services.AddScoped<IBuscaAtivaService, BuscaAtivaService>();
 builder.Services.AddScoped<IObservacaoService, ObservacaoService>();
 builder.Services.AddScoped<IFinalizarAtendimentoService, FinalizarAtendimentoService>();
+builder.Services.AddScoped<ITeleoperadorService, TeleoperadorService>();
+builder.Services.AddSingleton<IAutomacaoESaude, AutomacaoESaude>();
 
 var app = builder.Build();
+app.UseHardening();
 app.UseDefaultFiles();
 app.MapStaticAssets();
 
@@ -36,7 +41,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-app.UseHttpsRedirection();
+
 app.UseAuthorization();
 app.MapControllers();
 app.MapFallbackToFile("/index.html");

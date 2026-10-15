@@ -5,7 +5,7 @@ namespace MonitoramentoGestante.Server.Models
     {
         // sempre aparecem
         public string? Enfermeira {  get; set; }
-        public string? Teleoperador { get; set; }
+        public int? TeleoperadorId { get; set; }
         public bool? ConseguiuContato { get; set; }
         public string? Gestante { get; set; }
         public string? Cns {  get; set; }
@@ -27,9 +27,12 @@ namespace MonitoramentoGestante.Server.Models
         public DateOnly? DataRetorno { get; set; }
 
         // classificação Puérpera
+        // classificação Puérpera
         public bool? NasceuVivo { get; set; }
-        public string? LocalParto { get; set; }
-        public string? OutroLocal {  get; set; }
+        public int? EstabelecimentoIdHospitalParto { get; set; }   
+        public int? ParametroIdOutroLocalDeParto { get; set; }     
+        public string? OutroLocal { get; set; }                    
+        
         public bool? BebeRisco { get; set; }
         public bool? ObitoNeonatal {  get; set; }
         public bool? ObitoMaterno { get; set; }

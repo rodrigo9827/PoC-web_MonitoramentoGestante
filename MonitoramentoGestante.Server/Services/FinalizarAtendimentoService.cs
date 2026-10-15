@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc.Formatters;
-using MonitoramentoGestante.Server.Data;
+﻿using MonitoramentoGestante.Server.Data;
 using MonitoramentoGestante.Server.Models;
 using MonitoramentoGestante.Server.Regras;
-using System.Reflection.Metadata.Ecma335;
 using static MonitoramentoGestante.Server.Services.GravacaoGestante;
+
 // Eu sou o cara que registra o finalizar atendimento de verdade,
-// recebo o formulário, confiro tudo com as regras do forms.py da PoC e,
-// se estiver certo, monto a linha do histórico e a situação atual de
-// gestante, aprooveitando só os campos da situação marcada
+// recebo o formulário, troco os Ids do teleoperador e do local de parto
+// (hospital da Core.Estabelecimento ou outro local da Core.Parametro)
+// pelos nomes que estão no banco, confiro tudo com as regras do forms.py da PoC e,
+// se estiver certo, monto a linha do histórico e a situação atual da
+// gestante, aproveitando só os campos da situação marcada
 // (sem contato / Gestante / Puérpera / Aborto), e entrego as duas para o
 // GravacaoGestante gravar junto.
 namespace MonitoramentoGestante.Server.Services
@@ -25,7 +26,15 @@ namespace MonitoramentoGestante.Server.Services
 
         public ResultadoGravacao Finalizar(FinalizarAtendimentoEntrada entrada)
         {
-            var resultado = new ResultadoGravacao { Erros = Validar(entrada) };
+            // troca os Ids que vieram da tela pelos nomes que vão pro histórico
+            var nomeTeleoperador = BuscarTeleoperador(entrada.TeleoperadorId);
+            var nomeHospital = BuscarHospital(entrada.EstabelecimentoIdHospitalParto);
+            var nomeOutroLocal = BuscarOutroLocal(entrada.ParametroIdOutroLocalDeParto);
+
+            var resultado = new ResultadoGravacao
+            {
+                Erros = Validar(entrada, nomeTeleoperador, nomeHospital, nomeOutroLocal)
+            };
             if (!resultado.Sucesso) return resultado;
 
             // prepara os valores Já Validados
@@ -56,15 +65,18 @@ namespace MonitoramentoGestante.Server.Services
             var qualCaso = casoCritico ? entrada.QualCasoCritico!.Trim() : null;
             var observacoes = (entrada.Observacoes ?? "").Trim();
             // caso critico no começo da obs.
-            var observacaoComCaso = qualCaso is null ? observacoes : $"[CASO CRITÍCO] {qualCaso}\n{observacoes}";
+            var observacaoComCaso = qualCaso is null ? observacoes : $"[CASO CRÍTICO] {qualCaso}\n{observacoes}";
 
-            // A linha do Histórico 
+            // local do parto só vale para Puérpera
+            bool temOutroLocal = ehPuerpera && entrada.ParametroIdOutroLocalDeParto is not null;
+
+            // A linha do Histórico
             var historico = new MonitoraGestanteAdm
             {
                 DataHoraModificacao = agora,
                 Formulario = NomeFormulario,
                 Enfermeira = entrada.Enfermeira,
-                Teleoperador = Texto(entrada.Teleoperador),
+                Teleoperador = nomeTeleoperador,
                 Gestante = Texto(entrada.Gestante),
                 Cns = cns,
                 Cpf = cpf,
@@ -87,8 +99,12 @@ namespace MonitoramentoGestante.Server.Services
 
                 // Puérpera
                 NasceuVivo = ehPuerpera ? SimNaoOuNull(entrada.NasceuVivo) : null,
-                LocalParto = ehPuerpera ? Texto(entrada.LocalParto) : null,
-                OutroLocal = ehPuerpera && entrada.LocalParto == "Outro" ? Texto(entrada.OutroLocal) : null,
+                // nome em texto (hospital OU outro local) para leitura fácil no histórico
+                LocalParto = ehPuerpera ? (nomeHospital ?? nomeOutroLocal) : null,
+                // Ids no padrão do Pedro: só um dos dois vem preenchido
+                EstabelecimentoIdHospitalParto = ehPuerpera ? entrada.EstabelecimentoIdHospitalParto : null,
+                ParametroIdOutroLocalDeParto = ehPuerpera ? entrada.ParametroIdOutroLocalDeParto : null,
+                OutroLocal = temOutroLocal ? Texto(entrada.OutroLocal) : null,
                 BebeRisco = ehPuerpera ? SimNaoOuNull(entrada.BebeRisco) : null,
                 ObitoNeonatal = ehPuerpera ? SimNaoOuNull(entrada.ObitoNeonatal) : null,
                 ObitoMaterno = ehPuerpera ? SimNaoOuNull(entrada.ObitoMaterno) : null,
@@ -112,14 +128,14 @@ namespace MonitoramentoGestante.Server.Services
                 Cpf = cpf,
                 Gestante = Texto(entrada.Gestante),
                 Enfermeira = entrada.Enfermeira,
-                Teleoperador = Texto(entrada.Teleoperador),
+                Teleoperador = nomeTeleoperador,
                 Classificacao = conseguiu ? entrada.Classificacao : null,
                 ConseguiuContato = SimNao(conseguiu),
                 DataContato = contato,
                 IgSemanas = ig is null ? null : (byte)ig.Value.Semanas,
                 IgDias = ig is null ? null : (byte)ig.Value.Dias,
                 DataRetorno = retorno,
-                AltoRisco = null,                 
+                AltoRisco = null,
                 CasoCritico = SimNao(casoCritico),
                 QualCasoCritico = qualCaso,
                 UltimaObservacao = UmaLinha(observacaoComCaso),
@@ -135,14 +151,51 @@ namespace MonitoramentoGestante.Server.Services
             return resultado;
         }
 
-        private static List<string> Validar(FinalizarAtendimentoEntrada e)
+        // busca o nome do teleoperador pelo Id (só os ativos); null = não achou
+        private string? BuscarTeleoperador(int? id)
+        {
+            if (id is null) return null;
+            return _context.Teleoperadores
+                .Where(t => t.Id == id && t.Ativo)
+                .Select(t => t.Nome)
+                .FirstOrDefault();
+        }
+
+        // busca o nome do hospital (Core.Estabelecimento, consulta do supervisor); null = não achou
+        private string? BuscarHospital(int? id)
+        {
+            if (id is null) return null;
+            return _context.Hospitais
+                .Where(h => h.Id == id)
+                .Select(h => h.Nome)
+                .FirstOrDefault();
+        }
+
+        // busca o nome do outro local (Core.Parametro, OutrosLocaisDePartoRN); null = não achou
+        private string? BuscarOutroLocal(int? id)
+        {
+            if (id is null) return null;
+            return _context.OutrosLocaisParto
+                .Where(o => o.Id == id)
+                .Select(o => o.Nome)
+                .FirstOrDefault();
+        }
+
+        private static List<string> Validar(FinalizarAtendimentoEntrada e, string? nomeTeleoperador,
+                                            string? nomeHospital, string? nomeOutroLocal)
         {
             var erros = new List<string>();
 
             if (string.IsNullOrWhiteSpace(e.Enfermeira))
                 erros.Add("Escolha uma Enfermeira.");
-            if (string.IsNullOrWhiteSpace(e.Teleoperador))
-                erros.Add("Escolha o Teleoperador ou nenhum (NÃO DEIXE VAZIO).");
+
+            if (e.TeleoperadorId is null)
+                erros.Add("Escolha o teleoperador ou 'Nenhum' (não deixe vazio).");
+            else if (nomeTeleoperador is null)
+                erros.Add("Teleoperador não encontrado ou desativado. Atualize a página e escolha de novo.");
+            else if (nomeTeleoperador.Length > 50)
+                erros.Add("O nome do teleoperador passou de 50 letras.");
+
             // Verificar se precisa adicionar nome como chave
             var cns = (e.Cns ?? "").Trim();
             var cpf = (e.Cpf ?? "").Trim();
@@ -156,14 +209,14 @@ namespace MonitoramentoGestante.Server.Services
             if ((e.Gestante ?? "").Trim().Length > 255)
                 erros.Add("O nome da gestante passou de 255 digitos");
             if ((e.Numero ?? "").Trim().Length > 50)
-                erros.Add("O número do contato passou de 50 caracteres (padrãro de 9 a 11 digitos)");
+                erros.Add("O número do contato passou de 50 caracteres (padrão de 9 a 11 digitos)");
 
             if (e.DataContato is null)
                 erros.Add("Informe a data do contato.");
             else if (e.DataContato > DateOnly.FromDateTime(DateTime.Now))
                 erros.Add("A data do contato não pode ser depois de hoje!");
 
-            // Alterara para a aplicação do pedro
+            // Alterar para a aplicação do pedro
             if (e.CasoCritico is null)
                 erros.Add("Responda se é Caso Crítico.");
             else if (e.CasoCritico == true && string.IsNullOrWhiteSpace(e.QualCasoCritico))
@@ -195,10 +248,15 @@ namespace MonitoramentoGestante.Server.Services
 
                 if (e.Classificacao == "Puérpera")
                 {
-                    if (e.LocalParto == "Outro" && string.IsNullOrWhiteSpace(e.OutroLocal))
-                        erros.Add("Informe qual foi o outro local do parto.");
-                    else if (e.LocalParto == "Outro" && e.OutroLocal!.Trim().Length > 500)
-                        erros.Add("O outro local do parto passou de 500 letras.");
+                    // ou hospital, ou outro local (mesma regra do CHECK no banco)
+                    if (e.EstabelecimentoIdHospitalParto is not null && e.ParametroIdOutroLocalDeParto is not null)
+                        erros.Add("Escolha o hospital OU o outro local do parto, não os dois.");
+                    if (e.EstabelecimentoIdHospitalParto is not null && nomeHospital is null)
+                        erros.Add("Hospital do parto não encontrado. Atualize a página e escolha de novo.");
+                    if (e.ParametroIdOutroLocalDeParto is not null && nomeOutroLocal is null)
+                        erros.Add("Outro local do parto não encontrado. Atualize a página e escolha de novo.");
+                    if ((e.OutroLocal ?? "").Trim().Length > 500)
+                        erros.Add("O complemento do outro local do parto passou de 500 letras.");
 
                     if (e.HouveViolencia == true && string.IsNullOrWhiteSpace(e.TipoViolencia))
                         erros.Add("Escolha qual foi a violência.");
@@ -216,8 +274,4 @@ namespace MonitoramentoGestante.Server.Services
         // texto digitado: tira os espaços das pontas; vazio vira null
         private static string? Texto(string? texto) => VazioParaNull(texto?.Trim());
     }
-
-
 }
-    
-

@@ -1,16 +1,19 @@
 <!--
   Eu sou o cara que monta a tela principal: deixo escolher a enfermeira, mostro as gestantes dela
-  na tabela (com a coluna Busca Ativa), deixo selecionar uma gestante com um clique e mostro
-  as observações dela no quadro do fim da página. Também abro o formulário de Registrar Busca Ativa;
-  quando ele avisa que gravou, mostro o aviso verde, recarrego a lista e seleciono a gestante salva.
+  na tabela, deixo selecionar uma gestante (clique na linha mostra as observações; clique no NOME
+  também inicia a automação do e-Saúde), abro os formulários de Busca Ativa e de Finalizar
+  Atendimento, e mostro o que a automação está fazendo na linha de status.
 -->
 <script setup lang="ts">
-  import { ref, onMounted, watch } from 'vue'
+  import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
   import { listarEnfermeiras } from '@/services/enfermeiraService'
   import { listarGestantes, type Gestante } from '@/services/gestanteService'
   import { listarObservacoes, type Observacao } from '@/services/observacaoService'
+  import { iniciarBusca, lerStatus } from '@/services/automacaoService'
   import type { ResultadoGravacao } from '@/services/buscaAtivaService'
   import BuscaAtivaForm from './BuscaAtivaForm.vue'
+  import FinalizarAtendimentoForm from './FinalizarAtendimentoForm.vue'
+
 
   const enfermeiras = ref<string[]>([])
   const enfermeiraSelecionada = ref('')
@@ -18,12 +21,18 @@
   const erro = ref('')
   const aviso = ref('')
   const mostrarBuscaAtiva = ref(false)
+  const mostrarFinalizar = ref(false)
 
-  // gestante clicada na tabela e as observações dela
   const selecionada = ref<Gestante | null>(null)
   const observacoes = ref<Observacao[]>([])
   const carregandoObservacoes = ref(false)
   const erroObservacoes = ref('')
+
+
+  // o que a automação do e-Saúde está fazendo
+  const statusAutomacao = ref('')
+  const linkFicha = ref<string | null>(null)   // NOVO: o link da ficha, para a enfermeira clicar
+  let timerStatus: number | undefined
 
   async function carregarEnfermeiras() {
     try {
@@ -44,7 +53,6 @@
     }
   }
 
-  // Listener do clique na linha da tabela
   async function selecionarGestante(g: Gestante) {
     selecionada.value = g
     await carregarObservacoes()
@@ -54,12 +62,11 @@
     observacoes.value = []
     erroObservacoes.value = ''
     const chave = selecionada.value?.chave
-    if (!chave) return                    // sem CNS e sem CPF: o quadro avisa
+    if (!chave) return
 
     carregandoObservacoes.value = true
     try {
       const lista = await listarObservacoes(chave)
-      // se ela clicou em outra gestante enquanto esperava, esta resposta já não vale
       if (selecionada.value?.chave === chave) observacoes.value = lista
     } catch {
       if (selecionada.value?.chave === chave) {
@@ -70,6 +77,52 @@
     }
   }
 
+  // Listener do clique no NOME da gestante: inicia a automação do e-Saúde
+  async function iniciarAutomacao(g: Gestante) {
+    if (!g.cns && !g.cpf) {
+      statusAutomacao.value = 'Essa gestante não tem CNS nem CPF: não dá para buscar no e-Saúde.'
+      return
+    }
+    pararDePerguntar()
+    linkFicha.value = null                      // NOVO
+    statusAutomacao.value = 'Iniciando a busca no e-Saúde...'
+    try {
+      const status = await iniciarBusca(g.cns ?? '', g.cpf ?? '')
+      statusAutomacao.value = status.mensagem
+      // se já começou (ou estava ocupada), passa a perguntar de 1 em 1 segundo
+      perguntarStatus()
+    } catch {
+      statusAutomacao.value = 'Não foi possível falar com o servidor da automação.'
+    }
+  }
+
+  function perguntarStatus() {
+    pararDePerguntar()
+    timerStatus = window.setInterval(async () => {
+      try {
+        const status = await lerStatus()
+        statusAutomacao.value = status.mensagem
+        if (status.estado === 'pronta' && status.link) {
+          linkFicha.value = status.link          
+          window.open(status.link, '_blank')     
+          pararDePerguntar()
+        } else if (status.estado === 'erro' || status.estado === 'ociosa') {
+          pararDePerguntar()
+        }
+      } catch {
+        statusAutomacao.value = 'Não foi possível falar com o servidor da automação.'
+        pararDePerguntar()
+      }
+    }, 1000)
+  }
+
+  function pararDePerguntar() {
+    if (timerStatus !== undefined) {
+      clearInterval(timerStatus)
+      timerStatus = undefined
+    }
+  }
+
   function limparSelecao() {
     selecionada.value = null
     observacoes.value = []
@@ -77,36 +130,49 @@
     carregandoObservacoes.value = false
   }
 
-  // Listener do formulário: a busca ativa foi gravada
-  async function aoSalvarBuscaAtiva(resultado: ResultadoGravacao) {
-    mostrarBuscaAtiva.value = false
-    aviso.value = `Busca ativa registrada. Retorno: ${formatarData(resultado.dataRetorno)}`
+  async function aposGravar(resultado: ResultadoGravacao, textoAviso: string) {
+    aviso.value = textoAviso
     if (enfermeiraSelecionada.value) await carregarGestantes()
-
-    // seleciona a gestante que acabou de ser salva (se ela está na lista desta enfermeira)
     selecionada.value = gestantes.value.find(g => g.chave === resultado.chave) ?? null
     await carregarObservacoes()
   }
 
+  async function aoSalvarBuscaAtiva(resultado: ResultadoGravacao) {
+    mostrarBuscaAtiva.value = false
+    await aposGravar(resultado, `Busca ativa registrada. Retorno: ${formatarData(resultado.dataRetorno)}`)
+  }
+
+  async function aoSalvarFinalizar(resultado: ResultadoGravacao) {
+    mostrarFinalizar.value = false
+    const texto = resultado.dataRetorno
+      ? `Atendimento registrado. Retorno: ${formatarData(resultado.dataRetorno)}`
+      : 'Atendimento registrado.'
+    await aposGravar(resultado, texto)
+  }
+
   function abrirBuscaAtiva() {
     aviso.value = ''
+    mostrarFinalizar.value = false
     mostrarBuscaAtiva.value = true
   }
 
-  // "2026-09-23" -> "23/09/2026" (ou — se vier vazio)
+  function abrirFinalizar() {
+    aviso.value = ''
+    mostrarBuscaAtiva.value = false
+    mostrarFinalizar.value = true
+  }
+
   function formatarData(data: string | null): string {
     if (!data) return '—'
     const [ano, mes, dia] = data.split('-')
     return `${dia}/${mes}/${ano}`
   }
 
-  // "2026-10-08T15:10:00" -> "08/10/2026 15:10"
   function formatarDataHora(dataHora: string): string {
     const [data, hora] = dataHora.split('T')
     return `${formatarData(data ?? null)} ${(hora ?? '').slice(0, 5)}`
   }
 
-  // 30 e 2 -> "30s 02d" (ou — se não houver IG)
   function formatarIg(g: Gestante): string {
     if (g.igSemanas === null) return '—'
     const dois = (n: number | null) => String(n ?? 0).padStart(2, '0')
@@ -118,10 +184,11 @@
   }
 
   onMounted(carregarEnfermeiras)
+  onBeforeUnmount(pararDePerguntar)   // ao sair da tela, para de perguntar o status
 
-  // toda vez que a enfermeira escolhida mudar: limpa a seleção e busca as gestantes dela
   watch(enfermeiraSelecionada, () => {
     limparSelecao()
+    mostrarFinalizar.value = false
     carregarGestantes()
   })
 </script>
@@ -160,10 +227,11 @@
         <tr v-for="(g, i) in gestantes" :key="i"
             :class="{ 'alto-risco': g.altoRisco, selecionada: g === selecionada }"
             @click="selecionarGestante(g)">
-          <!-- TODO Etapa 9: o clique no NOME inicia a automação do e-Saúde.
-          Diferente da PoC: lá o clique na linha fazia tudo junto;
-          aqui o clique na linha só seleciona e mostra as observações. -->
-          <td class="nome">{{ textoOuTraco(g.gestante) }}</td>
+          <!-- clicar no NOME seleciona (o clique sobe para a linha) E inicia a automação -->
+          <td class="nome" @click.stop="selecionarGestante(g); iniciarAutomacao(g)"
+              title="Clique no nome para abrir a gestante no e-Saúde">
+            {{ textoOuTraco(g.gestante) }}
+          </td>
           <td>{{ textoOuTraco(g.cns) }}</td>
           <td>{{ formatarData(g.dataContato) }}</td>
           <td>{{ formatarIg(g) }}</td>
@@ -178,16 +246,37 @@
       {{ gestantes.length }} gestante(s)
     </p>
 
-    <button type="button" class="acao" :disabled="mostrarBuscaAtiva" @click="abrirBuscaAtiva">
-      Registrar Busca Ativa
-    </button>
+    <p v-if="statusAutomacao" class="automacao">
+      {{ statusAutomacao }}
+      <a v-if="linkFicha" :href="linkFicha" target="_blank" rel="noopener">Abrir a ficha no e-Saúde</a>
+    </p>
 
-    <!-- o formulário abre logo abaixo do botão, onde a enfermeira clicou -->
+    <div class="acoes">
+      <button type="button" :disabled="mostrarBuscaAtiva" @click="abrirBuscaAtiva">
+        Registrar Busca Ativa
+      </button>
+      <button type="button" :disabled="mostrarFinalizar || !selecionada" @click="abrirFinalizar">
+        Finalizar Atendimento
+      </button>
+    </div>
+    <p v-if="!selecionada" class="dica">
+      Selecione uma gestante na tabela para finalizar o atendimento dela.
+    </p>
+
     <BuscaAtivaForm v-if="mostrarBuscaAtiva"
                     :enfermeiras="enfermeiras"
                     :enfermeira-inicial="enfermeiraSelecionada"
                     @salvo="aoSalvarBuscaAtiva"
                     @fechar="mostrarBuscaAtiva = false" />
+
+    <FinalizarAtendimentoForm v-if="mostrarFinalizar && selecionada"
+                              :enfermeiras="enfermeiras"
+                              :enfermeira-inicial="enfermeiraSelecionada"
+                              :gestante-inicial="selecionada.gestante ?? ''"
+                              :cns-inicial="selecionada.cns ?? ''"
+                              :cpf-inicial="selecionada.cpf ?? ''"
+                              @salvo="aoSalvarFinalizar"
+                              @fechar="mostrarFinalizar = false" />
 
     <p v-if="erro" class="erro">
       {{ erro }}
@@ -196,7 +285,6 @@
       {{ aviso }}
     </p>
 
-    <!-- quadro de observações da gestante selecionada (no fim da tela, como na PoC) -->
     <section class="observacoes">
       <h2>Observações da gestante selecionada</h2>
 
@@ -236,9 +324,17 @@
     color: #4caf50;
   }
 
-  .acao {
+  .automacao {
+    color: #4aa3df;
+  }
+
+  .acoes {
     margin-top: 12px;
   }
+
+    .acoes button + button {
+      margin-left: 8px;
+    }
 
   table {
     border-collapse: collapse;
@@ -252,6 +348,11 @@
   }
 
   tbody tr {
+    cursor: pointer;
+  }
+
+  .nome {
+    text-decoration: underline;
     cursor: pointer;
   }
 

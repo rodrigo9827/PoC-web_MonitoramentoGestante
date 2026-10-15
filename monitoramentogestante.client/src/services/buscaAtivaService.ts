@@ -4,6 +4,7 @@
 // O que a tela envia (os mesmos campos do BuscaAtivaEntrada.cs)
 export interface BuscaAtivaEntrada {
   enfermeira: string
+  teleoperadorId: number | null      
   gestante: string
   cns: string
   cpf: string
@@ -18,7 +19,7 @@ export interface BuscaAtivaEntrada {
   horaInicio: string
 }
 
-// O que o servidor responde os mesmos campos do (ResultadoGravacao.cs)
+// O que o servidor responde (os mesmos campos do ResultadoGravacao.cs)
 export interface ResultadoGravacao {
   erros: string[]
   sucesso: boolean

@@ -6,7 +6,8 @@ using static MonitoramentoGestante.Server.Services.GravacaoGestante;
 namespace MonitoramentoGestante.Server.Services
 {
     // Eu sou o cara que registra a Busca Ativa de verdade.
-    // Recebo o formulário, confiro tudo com as regras do RegrasGestante e, se estiver certo,
+    // Recebo o formulário, troco o Id do teleoperador pelo nome que está na app.Teleoperadores,
+    // confiro tudo com as regras do RegrasGestante e, se estiver certo,
     // monto a linha do histórico e a situação atual da gestante e entrego as duas
     // para o GravacaoGestante gravar juntas numa transação. Nunca escrevo em dbo.* nem em stg.*.
     public class BuscaAtivaService : IBuscaAtivaService
@@ -23,7 +24,10 @@ namespace MonitoramentoGestante.Server.Services
 
         public ResultadoGravacao Registrar(BuscaAtivaEntrada entrada)
         {
-            var resultado = new ResultadoGravacao { Erros = Validar(entrada) };
+            // troca o Id que veio da tela pelo nome que vai pro histórico
+            var nomeTeleoperador = BuscarTeleoperador(entrada.TeleoperadorId);
+
+            var resultado = new ResultadoGravacao { Erros = Validar(entrada, nomeTeleoperador) };
             if (!resultado.Sucesso) return resultado;
 
             // ---------- 1. Preparar os valores (já validados) ----------
@@ -36,6 +40,7 @@ namespace MonitoramentoGestante.Server.Services
             var cns = VazioParaNull(entrada.Cns?.Trim());
             var cpf = VazioParaNull(RegrasGestante.SoDigitos(entrada.Cpf));
             var chave = RegrasGestante.Chave(cns, cpf)!;
+            var teleoperador = nomeTeleoperador!;                 
 
             bool casoCritico = entrada.CasoCritico!.Value;
             var qualCaso = casoCritico ? entrada.QualCasoCritico!.Trim() : null;
@@ -49,6 +54,7 @@ namespace MonitoramentoGestante.Server.Services
                 DataHoraModificacao = agora,
                 Formulario = NomeFormulario,
                 Enfermeira = entrada.Enfermeira,
+                Teleoperador = teleoperador,
                 Gestante = entrada.Gestante!.Trim(),
                 Cns = cns,
                 Cpf = cpf,
@@ -74,6 +80,7 @@ namespace MonitoramentoGestante.Server.Services
                 Cpf = cpf,
                 Gestante = entrada.Gestante.Trim(),
                 Enfermeira = entrada.Enfermeira,
+                Teleoperador = teleoperador,
                 Classificacao = entrada.Classificacao,
                 DataContato = contato,
                 IgSemanas = (byte)ig.Semanas,
@@ -95,13 +102,31 @@ namespace MonitoramentoGestante.Server.Services
             return resultado;
         }
 
+        // busca o nome do teleoperador pelo Id (só os ativos); null = não achou
+        private string? BuscarTeleoperador(int? id)
+        {
+            if (id is null) return null;
+            return _context.Teleoperadores
+                .Where(t => t.Id == id && t.Ativo)
+                .Select(t => t.Nome)
+                .FirstOrDefault();
+        }
+
         // As mesmas conferências da janela "Registrar Busca Ativa" do Python
-        private static List<string> Validar(BuscaAtivaEntrada e)
+        // (+ o teleoperador, que a PoC não tinha)
+        private static List<string> Validar(BuscaAtivaEntrada e, string? nomeTeleoperador)
         {
             var erros = new List<string>();
 
             if (string.IsNullOrWhiteSpace(e.Enfermeira))
                 erros.Add("Escolha a enfermeira.");
+
+            if (e.TeleoperadorId is null)
+                erros.Add("Escolha o teleoperador (ou 'Nenhum').");
+            else if (nomeTeleoperador is null)
+                erros.Add("Teleoperador não encontrado ou desativado. Atualize a página e escolha de novo.");
+            else if (nomeTeleoperador.Length > 50)
+                erros.Add("O nome do teleoperador passou de 50 letras.");
 
             if (string.IsNullOrWhiteSpace(e.Gestante))
                 erros.Add("Informe o nome da gestante.");

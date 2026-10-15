@@ -6,6 +6,7 @@
     public class BuscaAtivaEntrada
     {
         public string? Enfermeira { get; set; }
+        public int? TeleoperadorId { get; set; }      
         public string? Gestante { get; set; }
         public string? Cns { get; set; }
         public string? Cpf { get; set; }

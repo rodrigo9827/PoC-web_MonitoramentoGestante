@@ -1,9 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-
+// Eu sou o cara que representa a tabela app.Monitora_Gestante_Adm: o histórico.
+// Cada envio vira UMA linha nova.
 namespace MonitoramentoGestante.Server.Models
 {
     // Tabela app.Monitora_Gestante_Adm: o histórico. Cada envio vira UMA linha nova.
+
     [Table("Monitora_Gestante_Adm", Schema = "app")]
     public class MonitoraGestanteAdm
     {
@@ -61,6 +63,12 @@ namespace MonitoramentoGestante.Server.Models
 
         [Column("outro_local")]
         public string? OutroLocal { get; set; }
+
+        [Column("EstabelecimentoIdHospitalParto")]
+        public int? EstabelecimentoIdHospitalParto { get; set; }
+
+        [Column("ParametroIdOutroLocalDeParto")]
+        public int? ParametroIdOutroLocalDeParto { get; set; }
 
         [Column("bebe_risco")]
         public string? BebeRisco { get; set; }
