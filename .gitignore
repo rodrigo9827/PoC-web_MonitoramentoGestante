@@ -480,3 +480,58 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+##############################################################################
+## eu sou o cara que, além do padrão do .NET acima, segura os arquivos do
+## MonitoramentoGestante que NÃO podem ir pro GitHub: segredos, certificados,
+## relatórios de segurança, build do Vue e lixo de backup.
+##############################################################################
+
+# ---------- Segredos e variáveis de ambiente (NUNCA sobem) ----------
+.env
+.env.*
+!.env.example
+*.secrets.json
+secrets.json
+appsettings.*.local.json
+appsettings.Production.json
+
+# ---------- Certificados e chaves (NUNCA sobem) ----------
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.snk
+
+# ---------- Relatórios de segurança (mostram onde estão as falhas) ----------
+relatorios-seguranca/
+*gitleaks*.json
+*gitleaks*.txt
+*semgrep*.txt
+*semgrep*.json
+
+# ---------- Front em Vue / Vite ----------
+monitoramentogestante.client/dist/
+monitoramentogestante.client/dist-ssr/
+monitoramentogestante.client/coverage/
+monitoramentogestante.client/.vite/
+monitoramentogestante.client/*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+*.tsbuildinfo
+
+# ---------- Selenium / Chrome da automação ----------
+chromedriver*
+selenium-manager*
+*.png.tmp
+screenshots/
+
+# ---------- Backups e restos ----------
+*.bak
+*.orig
+*.old
